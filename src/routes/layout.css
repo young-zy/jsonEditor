@@ -1,0 +1,14 @@
+@import 'tailwindcss';
+@import 'svelte-jsoneditor/themes/jse-theme-dark.css';
+
+html,
+body {
+	height: 100%;
+	overflow: hidden;
+}
+
+html.jse-theme-dark,
+html.jse-theme-dark body {
+	background: var(--jse-background-color, #1e1e1e);
+	color: var(--jse-text-color, #d4d4d4);
+}
