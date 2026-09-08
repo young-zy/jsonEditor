@@ -2,17 +2,15 @@
 	import { browser } from '$app/environment'
 	import EditorWrapper from '$lib/editorWrapper.svelte'
 	import { createCompareClassNames, parseEditorJson } from '$lib/compareJson'
+	import { loadWorkspace, saveWorkspace } from '$lib/persist'
+	import type { Content } from 'svelte-jsoneditor'
 
 	const THEME_KEY = 'json-editor-theme'
 
-	let contentLeft = $state({
-		text: undefined, // can be used to pass a stringified JSON document instead
-		json: {}
-	})
-	let contentRight = $state({
-		text: undefined, // can be used to pass a stringified JSON document instead
-		json: {}
-	})
+	let leftId = ''
+	let rightId = ''
+	let contentLeft = $state<Content>({ json: {} })
+	let contentRight = $state<Content>({ json: {} })
 	let compare = $state(false)
 	let dark = $state(browser && localStorage.getItem(THEME_KEY) === 'dark')
 	let syncScroll = $state(false)
@@ -23,6 +21,7 @@
 	let gutterEl = $state<HTMLDivElement | undefined>(undefined)
 	let paneAEl = $state<HTMLDivElement | undefined>(undefined)
 	let paneBEl = $state<HTMLDivElement | undefined>(undefined)
+	let hydrated = $state(false)
 
 	const MIN_PCT = 15
 	const MAX_PCT = 85
@@ -30,6 +29,46 @@
 	const jsonLeft = $derived(parseEditorJson(contentLeft))
 	const jsonRight = $derived(parseEditorJson(contentRight))
 	const compareClassNames = $derived(createCompareClassNames(jsonLeft, jsonRight, compare))
+
+	$effect(() => {
+		if (!browser) return
+		let cancelled = false
+		loadWorkspace().then((workspace) => {
+			if (cancelled) return
+			if (workspace) {
+				leftId = workspace.leftId
+				rightId = workspace.rightId
+				contentLeft = workspace.contentLeft
+				contentRight = workspace.contentRight
+				compare = workspace.settings.compare
+				dark = workspace.settings.dark
+				syncScroll = workspace.settings.syncScroll
+				leftPct = workspace.settings.leftPct
+			} else {
+				leftId = crypto.randomUUID()
+				rightId = crypto.randomUUID()
+			}
+			hydrated = true
+		})
+		return () => {
+			cancelled = true
+		}
+	})
+
+	$effect(() => {
+		if (!browser || !hydrated) return
+		const snapshot = {
+			leftId,
+			rightId,
+			contentLeft: $state.snapshot(contentLeft),
+			contentRight: $state.snapshot(contentRight),
+			settings: { compare, dark, syncScroll, leftPct }
+		}
+		const timer = setTimeout(() => {
+			void saveWorkspace(snapshot)
+		}, 300)
+		return () => clearTimeout(timer)
+	})
 
 	$effect(() => {
 		if (!browser) return
